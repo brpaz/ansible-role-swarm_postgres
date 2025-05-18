@@ -1,0 +1,71 @@
+---
+# Default variables for the Ansible role to deploy PostgreSQL
+## Docker Image
+postgres_service_name: "postgres"
+postgres_image: "ghcr.io/brpaz/docker-postgres-wal-g"
+postgres_version: "17-9-49b58c8"
+postgres_cpu_reservation: 0.2
+postgres_cpu_limit: 1
+postgres_memory_reservation: 128M
+postgres_memory_limit: 1G
+postgres_networks: []
+postgres_environment: {}
+
+# Postgres configuration
+postgres_client_package: "postgresql-client-17"
+postgres_root_password: "postgres"
+postgres_max_connections: 100
+postgres_shared_buffers: "128MB"
+postgres_custom_conf: {}
+postgres_port: 5432 # Added default port explicitly
+
+# WAL settings
+postgres_wal_enabled: false
+postgres_wal_level: "replica"
+postgres_wal_min_size: "80MB" # Fixed typo in variable name (was posgres_wal_min_size)
+postgres_wal_max_size: "1GB"
+postgres_archive_command: "wal-g wal-push %p"
+postgres_archive_mode: "on"
+
+postgres_archive_timeout: "60s"
+
+## Users and databases to create
+# Format for databases:
+# postgres_databases:
+#   - name: app_db
+#     owner: app_user  # Optional
+#     encoding: UTF8    # Optional
+#     lc_collate: en_US.UTF-8  # Optional
+#     lc_ctype: en_US.UTF-8  # Optional
+#     template: template0  # Optional
+postgres_databases: []
+
+# Format for users:
+# postgres_users:
+#   - name: app_user
+#     password: secure_password
+#     roles: ["CREATEDB", "LOGIN"]  # Optional
+#     privileges:  # Optional
+#       - database: app_db
+#         schema: public
+#         type: ALL
+#         privileges: ALL
+postgres_users: []
+
+## Backup Configuration
+# pg_dump backup settings
+postgres_backup_enabled: false
+postgres_backup_rclone_enabled: false
+postgres_backup_rclone_remote: ""
+postgres_backup_rclone_path: "/postgres_backups"
+postgres_backup_rclone_args: "--progress"
+postgres_backup_prune_enabled: true
+
+postgres_backup_dir: "/var/backups/postgres"
+postgres_backup_user: "postgres"
+postgres_backup_password: "{{ postgres_root_password }}"
+postgres_backup_keep_days: 7
+postgres_backup_timer: "weekly" # Options: daily, weekly, monthly
+postgres_backup_format: "custom" # Options: plain, custom, directory, tar
+postgres_backup_compress: true
+postgres_backup_databases: [] # Empty means back up all databases

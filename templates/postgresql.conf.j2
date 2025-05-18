@@ -1,0 +1,32 @@
+# PostgreSQL configuration file
+# This file is managed by Ansible - manual changes will be overwritten
+
+# CONNECTION SETTINGS
+listen_addresses = '{{ postgres_listen_addresses | default("localhost") }}'
+port = {{ postgres_port }}
+max_connections = {{ postgres_max_connections }}
+
+# MEMORY SETTINGS
+shared_buffers = {{ postgres_shared_buffers }}
+work_mem = {{ postgres_work_mem | default("4MB") }}
+maintenance_work_mem = {{ postgres_maintenance_work_mem | default("64MB") }}
+effective_cache_size = {{ postgres_effective_cache_size | default("4GB") }}
+
+# WRITE AHEAD LOG
+{% if postgres_wal_enabled %}
+wal_level = {{ postgres_wal_level | default("replica") }}
+max_wal_size = {{ postgres_wal_max_size }}
+min_wal_size = {{ postgres_wal_min_size }}
+archive_mode = {{ postgres_archive_mode }}
+archive_timeout = {{ postgres_archive_timeout }}
+{% if postgres_archive_command %}
+archive_command = '{{ postgres_archive_command }}'
+{% endif %}
+{% endif %}
+
+{% if postgres_custom_conf is defined %}
+# CUSTOM SETTINGS
+{% for setting, value in postgres_custom_conf.items() %}
+{{ setting }} = {{ value }}
+{% endfor %}
+{% endif %}

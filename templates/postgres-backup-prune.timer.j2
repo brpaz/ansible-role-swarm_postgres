@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer for PostgreSQL Database Backup Pruning
+Requires=postgres-backup-prune.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

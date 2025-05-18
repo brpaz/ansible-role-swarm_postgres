@@ -1,0 +1,46 @@
+---
+# Tasks for database and user management
+- name: Create users
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    state: present
+    login_host: 127.0.0.1
+    login_user: postgres
+    login_password: "{{ postgres_root_password }}"
+    port: "{{ postgres_port }}"
+    role_attr_flags: "{{ item.roles | default([]) | join(',') }}"
+  loop: "{{ postgres_users }}"
+  when: postgres_users | length > 0
+
+- name: Create databases
+  community.postgresql.postgresql_db:
+    name: "{{ item.name }}"
+    owner: "{{ item.owner | default(omit) }}"
+    encoding: "{{ item.encoding | default(omit) }}"
+    lc_collate: "{{ item.lc_collate | default(omit) }}"
+    lc_ctype: "{{ item.lc_ctype | default(omit) }}"
+    template: "{{ item.template | default(omit) }}"
+    state: present
+    login_host: 127.0.0.1
+    login_user: postgres
+    login_password: "{{ postgres_root_password }}"
+    port: "{{ postgres_port }}"
+  loop: "{{ postgres_databases }}"
+  when: postgres_databases | length > 0
+
+- name: Set user privileges
+  community.postgresql.postgresql_privs:
+    database: "{{ item.1.database }}"
+    type: "{{ item.1.type | default('omit') }}"
+    schema: "{{ item.1.schema | default(omit) }}"
+    objs: "{{ item.1.objs | default('omit') }}"
+    roles: "{{ item.0.name }}"
+    privs: "{{ item.1.privileges }}"
+    state: present
+    login_host: 127.0.0.1
+    login_user: postgres
+    login_password: "{{ postgres_root_password }}"
+    port: "{{ postgres_port }}"
+  loop: "{{ postgres_users | subelements('privileges', skip_missing=True) }}"
+  when: postgres_users | length > 0

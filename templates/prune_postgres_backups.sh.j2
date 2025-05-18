@@ -1,0 +1,56 @@
+#!/bin/bash
+# PostgreSQL backup pruning script managed by Ansible
+# This script is used to remove old PostgreSQL backups
+
+# Exit on any error and ensure pipeline failures are caught
+set -e
+set -o pipefail
+
+# Config variables set by Ansible
+BACKUP_DIR="{{ postgres_backup_dir }}"
+KEEP_DAYS="{{ postgres_backup_keep_days }}"
+
+# Logging function
+log() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] [$level] $message"
+}
+
+# Log function shortcuts
+log_info() {
+    log "INFO" "$1"
+}
+
+log_error() {
+    log "ERROR" "$1"
+}
+
+log_warn() {
+    log "WARNING" "$1"
+}
+
+log_success() {
+    log "SUCCESS" "$1"
+}
+
+log_info "Starting backup pruning process..."
+log_info "Cleaning up backups older than $KEEP_DAYS days in $BACKUP_DIR"
+
+# Check if backup directory exists
+if [ ! -d "$BACKUP_DIR" ]; then
+    log_error "Backup directory $BACKUP_DIR does not exist"
+    exit 1
+fi
+
+# Clean up old SQL, dump, and tar files
+log_info "Removing old SQL, dump, and tar files..."
+find $BACKUP_DIR -type f \( -name "*.sql*" -o -name "*.dump" -o -name "*.tar*" \) -mtime +$KEEP_DAYS -delete
+
+# Handle directory format backups - we need to handle potential "no matches" without failing
+log_info "Removing old directory format backups..."
+# We use || true to prevent script from exiting if there are no matching directories
+find $BACKUP_DIR -type d -name "*.dir" -mtime +$KEEP_DAYS -exec rm -rf {} \; 2>/dev/null || true
+
+log_success "Backup pruning completed successfully at $(date)"

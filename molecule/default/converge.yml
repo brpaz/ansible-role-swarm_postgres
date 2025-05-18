@@ -1,0 +1,64 @@
+- name: Converge
+  hosts: all
+  vars:
+    docker_install_compose: false
+    swarm_network: "swarm_net"
+
+  pre_tasks:
+    - name: Update apt cache.
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 600
+      when: ansible_os_family == 'Debian'
+
+    - name: Install Base packages.
+      ansible.builtin.package:
+        name:
+          - python3-pip
+          - python3-docker
+          - gnupg
+          - curl
+          - ca-certificates
+        state: present
+      when: ansible_os_family == 'Debian'
+
+  tasks:
+    - name: Install docker
+      ansible.builtin.include_role:
+        name: geerlingguy.docker
+
+    - name: Init swarm
+      community.docker.docker_swarm:
+        state: present
+
+    - name: Create overlay network
+      community.docker.docker_network:
+        name: "{{ swarm_network }}"
+        driver: overlay
+        attachable: true
+        state: present
+
+    - name: Include the role
+      ansible.builtin.include_role:
+        name: brpaz.swarm_postgres
+      vars:
+        postgres_networks:
+          - "{{ swarm_network }}"
+        postgres_environment:
+          POSTGRES_USER: "postgres"
+        postgres_backup_enabled: true
+        postgres_backup_dir: "/var/lib/postgresql/backups"
+        postgres_backup_rclone_enabled: false
+        postgres_databases:
+          - name: "test_db"
+            owner: "app_user"
+        postgres_users:
+          - name: app_user
+            password: test
+            roles: ["LOGIN"]
+            privileges:
+              - database: test_db
+                type: schema
+                objs: public
+                privileges: ALL
+

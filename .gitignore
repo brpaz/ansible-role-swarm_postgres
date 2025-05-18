@@ -1,0 +1,11 @@
+
+# Devenv
+.devenv*
+devenv.local.nix
+
+# direnv
+.direnv
+
+.ansible
+
+__pycache__/

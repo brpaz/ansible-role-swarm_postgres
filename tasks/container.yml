@@ -1,0 +1,55 @@
+---
+# Tasks related to Docker container deployment
+
+- name: Create postgres data volume
+  community.docker.docker_volume:
+    name: postgres_data
+    driver: local
+    state: present
+
+- name: Create wal archive volume
+  community.docker.docker_volume:
+    name: postgres_wal
+    driver: local
+    state: present
+
+- name: Create swarm service
+  community.docker.docker_swarm_service:
+    name: "{{ postgres_service_name }}"
+    state: present
+    image: "{{ postgres_image }}:{{ postgres_version }}"
+    mounts:
+      - type: volume
+        source: postgres_data
+        target: /var/lib/postgresql/data
+      - type: volume
+        source: postgres_wal
+        target: /var/lib/postgresql/wal
+      - type: bind
+        source: /etc/postgres
+        target: /etc/postgresql
+    networks: "{{ postgres_networks }}"
+    env: "{{ postgres_environment | combine({'POSTGRES_PASSWORD': postgres_root_password }) }}"
+    publish:
+      - published_port: "{{ postgres_port }}"
+        target_port: 5432
+    reservations:
+      cpus: "{{ postgres_cpu_reservation }}"
+      memory: "{{ postgres_memory_reservation }}"
+    limits:
+      cpus: "{{ postgres_cpu_limit }}"
+      memory: "{{ postgres_memory_limit }}"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 10s
+
+- name: Wait for service to be in healthy state
+  ansible.builtin.command: docker ps --filter "name=postgres" --format {% raw %}"{{.Status}}"{% endraw %}
+  register: container_status
+  until: "'healthy' in container_status.stdout"
+  retries: 10
+  delay: 5
+  changed_when: false

@@ -1,0 +1,16 @@
+[Unit]
+Description=PostgreSQL Database Backup Service
+After=docker.service
+Wants=postgres-backup.timer
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pg-backup.sh
+User=root
+Group=root
+Nice=19
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

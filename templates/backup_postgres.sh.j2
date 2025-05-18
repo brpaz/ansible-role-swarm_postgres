@@ -1,0 +1,167 @@
+#!/bin/bash
+# PostgreSQL backup script managed by Ansible
+# This script is used to backup PostgreSQL databases
+
+# Ensure pipeline failures are caught
+# Note: We don't use 'set -e' because we have our own error handling
+set -o pipefail
+
+# Config variables set by Ansible
+BACKUP_DIR="{{ postgres_backup_dir }}"
+POSTGRES_USER="postgres"
+POSTGRES_PASSWORD="{{ postgres_root_password }}"
+POSTGRES_HOST="127.0.0.1"
+POSTGRES_PORT="{{ postgres_port }}"
+KEEP_DAYS="{{ postgres_backup_keep_days }}"
+BACKUP_FORMAT="{{ postgres_backup_format }}"
+BACKUP_COMPRESS="{{ postgres_backup_compress }}"
+RCLONE_ENABLED="{{ postgres_backup_rclone_enabled }}"
+RCLONE_REMOTE="{{ postgres_backup_rclone_remote }}"
+RCLONE_ARGS="{{ postgres_backup_rclone_args | default('') }}"
+
+# Initialize a variable to track if any errors occurred
+BACKUP_ERRORS=0
+
+# Logging function
+log() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] [$level] $message"
+}
+
+# Log function shortcuts
+log_info() {
+    log "INFO" "$1"
+}
+
+log_error() {
+    log "ERROR" "$1"
+}
+
+log_warn() {
+    log "WARNING" "$1"
+}
+
+log_success() {
+    log "SUCCESS" "$1"
+}
+
+# Create backup directory if it doesn't exist
+mkdir -p $BACKUP_DIR
+log_info "Using backup directory: $BACKUP_DIR"
+
+# Format timestamp for filenames
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+# Set format options
+FORMAT_OPT=""
+case "$BACKUP_FORMAT" in
+  "custom")
+    FORMAT_OPT="-Fc"
+    EXT=".dump"
+    ;;
+  "directory")
+    FORMAT_OPT="-Fd"
+    EXT=".dir"
+    ;;
+  "tar")
+    FORMAT_OPT="-Ft"
+    EXT=".tar"
+    ;;
+  *)
+    FORMAT_OPT="-Fp"
+    EXT=".sql"
+    ;;
+esac
+log_info "Using backup format: $BACKUP_FORMAT"
+
+# Set compression option
+COMPRESS_OPT=""
+if [ "$BACKUP_COMPRESS" = "true" ] && [ "$BACKUP_FORMAT" != "custom" ]; then
+    COMPRESS_OPT="-Z9"
+    EXT="${EXT}.gz"
+    log_info "Compression enabled"
+fi
+
+# Function to perform backup
+do_backup() {
+    DB_NAME=$1
+    BACKUP_FILE="$BACKUP_DIR/${DB_NAME}_${TIMESTAMP}${EXT}"
+
+    log_info "Backing up database: $DB_NAME to $BACKUP_FILE"
+
+    export PGPASSWORD="$POSTGRES_PASSWORD"
+
+    if [ "$BACKUP_FORMAT" = "directory" ]; then
+        pg_dump -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER $FORMAT_OPT $COMPRESS_OPT -f $BACKUP_FILE $DB_NAME
+    else
+        pg_dump -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER $FORMAT_OPT $COMPRESS_OPT $DB_NAME > $BACKUP_FILE
+    fi
+
+    if [ $? -ne 0 ]; then
+        log_error "Failed to backup database: $DB_NAME"
+        return 1
+    fi
+
+    log_success "Successfully backed up database: $DB_NAME"
+    return 0
+}
+
+# Get database list or use specified databases
+DATABASES=""
+{% if postgres_backup_databases|length > 0 %}
+DATABASES="{{ postgres_backup_databases|join(' ') }}"
+log_info "Backing up specified databases: $DATABASES"
+{% else %}
+export PGPASSWORD="$POSTGRES_PASSWORD"
+log_info "Fetching list of all databases..."
+# Use a more robust command to list databases, with explicit error handling
+DATABASES=$(psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres';" 2>/dev/null)
+DB_LIST_STATUS=$?
+if [ $DB_LIST_STATUS -ne 0 ]; then
+    log_error "Failed to connect to PostgreSQL server or list databases (error code: $DB_LIST_STATUS)"
+    exit 1
+fi
+if [ -z "$DATABASES" ]; then
+    log_error "No databases found for backup"
+    exit 1
+fi
+log_info "Found databases: $DATABASES"
+{% endif %}
+
+# Backup each database
+log_info "Starting backup process..."
+for DB in $DATABASES; do
+    do_backup $DB
+    if [ $? -ne 0 ]; then
+        BACKUP_ERRORS=1
+    fi
+done
+
+# Handle rclone upload if enabled
+if [ "$RCLONE_ENABLED" = "true" ]; then
+    log_info "Uploading backups to rclone remote: $RCLONE_REMOTE"
+    # Sync all backup files to rclone remote
+    rclone sync $BACKUP_DIR $RCLONE_REMOTE $RCLONE_ARGS
+
+    if [ $? -eq 0 ]; then
+        log_success "Successfully uploaded backups to rclone remote"
+        # Clean up all local backup files after successful upload
+        log_info "Removing local backup files..."
+        rm -rf $BACKUP_DIR/*
+        log_info "Local backup files removed"
+    else
+        log_error "Failed to upload backups to rclone remote. Local files will be preserved."
+        BACKUP_ERRORS=1
+    fi
+fi
+
+# Complete the backup process
+if [ $BACKUP_ERRORS -eq 0 ]; then
+    log_success "Backup process completed successfully at $(date)"
+    exit 0
+else
+    log_error "Backup process completed with errors at $(date)"
+    exit 1
+fi

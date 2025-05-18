@@ -1,0 +1,94 @@
+---
+# Tasks for pg_dump backup configuration
+
+- name: Ensure backup directory exists
+  ansible.builtin.file:
+    path: "{{ postgres_backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+
+- name: Install pg_dump backup script
+  ansible.builtin.template:
+    src: backup_postgres.sh.j2
+    dest: /usr/local/bin/pg-backup.sh
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+
+- name: Install systemd service for PostgreSQL backup
+  ansible.builtin.template:
+    src: postgres-backup.service.j2
+    dest: /etc/systemd/system/postgres-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Install systemd timer for PostgreSQL backup
+  ansible.builtin.template:
+    src: postgres-backup.timer.j2
+    dest: /etc/systemd/system/postgres-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Enable and start PostgreSQL backup timer
+  ansible.builtin.systemd:
+    name: postgres-backup.timer
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: true
+
+# Backup pruning tasks - only when rclone is not enabled and pruning is enabled
+- name: Install backup pruning script
+  ansible.builtin.template:
+    src: prune_postgres_backups.sh.j2
+    dest: /usr/local/bin/pg-backup-prune.sh
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+  when:
+    - postgres_backup_prune_enabled | bool
+    - not postgres_backup_rclone_enabled | bool
+
+- name: Install systemd service for PostgreSQL backup pruning
+  ansible.builtin.template:
+    src: postgres-backup-prune.service.j2
+    dest: /etc/systemd/system/postgres-backup-prune.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when:
+    - postgres_backup_prune_enabled | bool
+    - not postgres_backup_rclone_enabled | bool
+
+- name: Install systemd timer for PostgreSQL backup pruning
+  ansible.builtin.template:
+    src: postgres-backup-prune.timer.j2
+    dest: /etc/systemd/system/postgres-backup-prune.timer
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when:
+    - postgres_backup_prune_enabled | bool
+    - not postgres_backup_rclone_enabled | bool
+
+- name: Enable and start PostgreSQL backup pruning timer
+  ansible.builtin.systemd:
+    name: postgres-backup-prune.timer
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: true
+  when:
+    - postgres_backup_prune_enabled | bool
+    - not postgres_backup_rclone_enabled | bool

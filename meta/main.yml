@@ -1,0 +1,25 @@
+galaxy_info:
+  role_name: swarm_postgres
+  namespace: brpaz
+  author: Bruno Paz
+  description: An Ansible role to deploy a PostgreSQL database in a Docker Swarm cluster
+  license: MIT
+  min_ansible_version: "2.10"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+
+  galaxy_tags:
+    - docker
+    - swarm
+    - postgresql
+    - database
+
+collections:
+  - community.docker
+  - community.postgresql

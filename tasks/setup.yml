@@ -1,0 +1,59 @@
+---
+# Tasks for repository and package installation
+
+- name: Create directory for PostgreSQL GPG key
+  ansible.builtin.file:
+    path: /usr/share/postgresql-common/pgdg
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Download PostgreSQL GPG key
+  ansible.builtin.get_url:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    dest: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+    mode: "0644"
+  become: true
+
+- name: Add PostgreSQL repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main"
+    state: present
+    update_cache: true
+  become: true
+
+- name: Install PostgreSQL utilities
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - "{{ postgres_client_package }}"
+    - python3-psycopg2
+  become: true
+
+- name: Ensure PostgreSQL configuration directory exists
+  ansible.builtin.file:
+    path: /etc/postgres
+    state: directory
+    mode: "0644"
+    owner: "root"
+    group: "root"
+  become: true
+
+- name: Create PostgreSQL configuration file
+  ansible.builtin.template:
+    src: postgresql.conf.j2
+    dest: /etc/postgres/postgresql.conf
+    mode: "0644"
+  become: true
+
+- name: Generate .pgpass file
+  ansible.builtin.copy:
+    content: "127.0.0.1:5432:*:postgres:{{ postgres_root_password }}\n"
+    dest: "/root/.pgpass"
+    mode: "0600"
+    owner: "root"
+    group: "root"
+  become: true
