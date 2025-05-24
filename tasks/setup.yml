@@ -35,7 +35,7 @@
 
 - name: Ensure PostgreSQL configuration directory exists
   ansible.builtin.file:
-    path: /etc/postgres
+    path: /etc/postgresql
     state: directory
     mode: "0755"
     owner: "root"
@@ -45,7 +45,7 @@
 - name: Create PostgreSQL configuration file
   ansible.builtin.template:
     src: postgresql.conf.j2
-    dest: /etc/postgres/postgresql.conf
+    dest: /etc/postgresql/postgresql.conf
     mode: "0644"
   become: true
 

@@ -3,7 +3,7 @@
 
 - name: Create WAL-G environment file directory
   ansible.builtin.file:
-    path: /etc/postgres/walg
+    path: /etc/postgresql/walg
     state: directory
     owner: root
     group: root
@@ -13,7 +13,7 @@
 - name: Create WAL-G environment file
   ansible.builtin.template:
     src: walg-env.j2
-    dest: /etc/postgres/walg/walg-env
+    dest: /etc/postgresql/walg/walg-env
     owner: root
     group: root
     mode: "0640"

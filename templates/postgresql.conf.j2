@@ -29,6 +29,4 @@ archive_command = '{{ postgres_archive_command }}'
 {% endfor %}
 {% endif %}
 
-# Optional include any recovery configuration file
-# This is useful for setting up replication or point-in-time recovery
-include_if_exists = '/var/lib/postgresql/data/recovery.conf'
+

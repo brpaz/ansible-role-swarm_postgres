@@ -51,7 +51,7 @@
         source: postgres_data
         target: /var/lib/postgresql/data
       - type: bind
-        source: /etc/postgres
+        source: /etc/postgresql
         target: /etc/postgresql
         readonly: true
     networks: "{{ postgres_networks }}"
