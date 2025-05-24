@@ -34,7 +34,7 @@
 
 - name: Combine all environment variables
   ansible.builtin.set_fact:
-    postgres_env: "{{ postgres_environment | combine({'POSTGRES_PASSWORD': postgres_root_password }) | combine(walg_env_vars) }}"
+    postgres_env: "{{ postgres_environment | combine({'POSTGRES_PASSWORD': postgres_root_password}) | combine(walg_env_vars) }}"
 
 - name: Create swarm service
   community.docker.docker_swarm_service:

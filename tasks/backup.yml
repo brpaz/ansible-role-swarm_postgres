@@ -41,8 +41,8 @@
   ansible.builtin.systemd:
     name: postgres-backup.timer
     state: started
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
+    daemon_reload: true
   become: true
 
 # Backup pruning tasks - only when rclone is not enabled and pruning is enabled
@@ -86,8 +86,8 @@
   ansible.builtin.systemd:
     name: postgres-backup-prune.timer
     state: started
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
+    daemon_reload: true
   become: true
   when:
     - postgres_backup_prune_enabled | bool

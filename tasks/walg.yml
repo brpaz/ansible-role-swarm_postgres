@@ -78,8 +78,8 @@
   ansible.builtin.systemd:
     name: walg-backup.timer
     state: started
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
+    daemon_reload: true
   become: true
   when: postgres_walg_base_backup_timer_enabled | bool
 
@@ -106,7 +106,7 @@
   ansible.builtin.systemd:
     name: walg-retention.timer
     state: started
-    enabled: yes
-    daemon_reload: yes
+    enabled: true
+    daemon_reload: true
   become: true
   when: postgres_walg_retention_timer_enabled | bool
