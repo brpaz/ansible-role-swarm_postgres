@@ -46,13 +46,8 @@
           - "{{ swarm_network }}"
         postgres_environment:
           POSTGRES_USER: "postgres"
-        postgres_wal_enabled: true
-        postgres_walg_enabled: true
-        postgres_walg_aws_access_key_id: "000ea50ed8c7e2c0000000015"
-        postgres_walg_aws_secret_access_key: "K000Cdu4FTmEEuIb5hVxmFrq79esw/A"
-        postgres_walg_s3_prefix: "s3://test-walg/postgres"
-        postgres_walg_aws_region: "us-west-000"
-        postgres_walg_aws_endpoint: "s3.us-west-000.backblazeb2.com"
+        postgres_wal_enabled: false
+        postgres_walg_enabled: false
         postgres_backup_enabled: false
         postgres_backup_rclone_enabled: false
         postgres_databases:

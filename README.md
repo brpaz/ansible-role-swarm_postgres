@@ -270,7 +270,7 @@ postgres_walg_backup_retention_count: 7
 
 ##### Restoring from WAL-G Backups
 
-The role installs a restore script at `/usr/local/bin/walg-restore.sh` that can be used to restore a database from WAL-G backups.
+The role installs a restore script at `/usr/local/bin/walg-restore.sh` that can be used to restore a database from WAL-G backups. The script handles the complete restore process, including recovery monitoring and health checks.
 
 To restore the latest backup:
 ```bash
@@ -292,9 +292,21 @@ To perform a dry run without actually executing the restore:
 sudo /usr/local/bin/walg-restore.sh --dry-run --latest
 ```
 
+The restore process includes:
+
+1. **Smart Health Checks**: The script automatically adjusts health check parameters during recovery to ensure proper monitoring.
+2. **Progress Tracking**: Detailed progress information including:
+   - Percentage of recovery completed
+   - Amount of WAL data replayed
+   - Time behind in replay
+3. **Automatic Cleanup**: After successful restore:
+   - Removes all recovery-related files
+   - Restores normal operational configuration
+   - Resets health check parameters
+
 ##### Monitoring WAL-G Backups
 
-The role installs a monitoring script at `/usr/local/bin/walg-monitor.sh` that can be used to check the status and health of your WAL-G backups.
+The role includes comprehensive monitoring capabilities through the `/usr/local/bin/walg-monitor.sh` script, which provides detailed insights into your backup and recovery processes.
 
 To list all backups:
 ```bash
@@ -311,27 +323,37 @@ To check backup status and health:
 sudo /usr/local/bin/walg-monitor.sh --status
 ```
 
-This monitoring script can be integrated with your monitoring systems like [NTFY](https://ntfy.sh) to ensure your backups are being executed correctly.
+The monitoring script provides:
+- Backup completion status and timing
+- WAL archiving statistics
+- Storage usage metrics
+- Recovery status (when applicable)
+- Health check status
+
+This monitoring can be integrated with monitoring systems like [NTFY](https://ntfy.sh) or any monitoring platform that can execute shell commands. The script's exit codes and structured output make it suitable for automated monitoring:
 
 ##### WAL-G Backup Retention Management
 
-The role implements a dual retention policy system that ensures your backups are managed efficiently:
+The role implements an efficient backup retention system that ensures optimal storage use while maintaining data safety:
 
-1. **Count-based retention**: Keeps a fixed number of the most recent backups (`postgres_walg_backup_retention_count`)
+1. **Count-based retention**: Maintains a specified number of the most recent backups (`postgres_walg_backup_retention_count`)
+2. **Smart cleanup**: Ensures WAL files are retained for all available backups
+3. **Safe deletion**: Validates backup dependencies before removal
 
-The role installs a dedicated retention script at `/usr/local/bin/walg-retention.sh` that handles backup cleanup. The script:
+The role installs a dedicated retention script at `/usr/local/bin/walg-retention.sh` that handles backup cleanup. The script provides:
 
-- Applies both retention policies independently (count-based and time-based)
-- Provides detailed logging of the retention process
-- Continues execution even if one retention policy fails
-- Shows a summary of remaining backups after cleanup
+- Detailed logging of the retention process
+- Safe handling of in-use backups
+- Cleanup of orphaned WAL files
+- Summary reporting of retained backups
 
-The retention service runs on a schedule defined by `postgres_walg_retention_timer_schedule` (default: daily at 1:30 AM) and includes:
+The retention service runs on a schedule defined by `postgres_walg_retention_timer_schedule` (default: daily at 1:30 AM) with these reliability features:
 
-- **Resilient execution**: If one retention policy fails, the other will still be applied
-- **Error handling**: Failures are logged but won't prevent the service from functioning
-- **Auto-recovery**: Includes restart capabilities to handle temporary failures
-- **Timeout protection**: Prevents hanging operations with a configurable timeout
+- **Resilient execution**: Continues partial execution even if some operations fail
+- **Error handling**: Comprehensive logging of any issues encountered
+- **Auto-recovery**: Automatic retry of failed operations
+- **Timeout protection**: Configurable timeouts to prevent hung processes
+- **Resource management**: Efficient cleanup of temporary files and logs
 
 You can manually trigger the retention process by running:
 ```bash

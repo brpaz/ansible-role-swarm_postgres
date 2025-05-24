@@ -219,38 +219,25 @@ docker run --rm \
     {{ postgres_image }}:{{ postgres_version }} \
     sh -c "touch ${PG_DATA_DIR}/recovery.signal"
 
-log "Starting PostgreSQL service with extended health check timeouts"
-docker service update \
-    --health-interval 10s \
-    --health-timeout 5s \
-    --health-retries 30 \
-    --health-start-period 60s \
-    {{ postgres_service_name }}
+log "Temporarily disabling health checks"
+docker service update --no-healthcheck {{ postgres_service_name }}
 
 docker service scale {{ postgres_service_name }}=1
 
-log "Waiting for PostgreSQL container to start and become healthy"
-timeout=300  # Extended timeout for recovery process
-interval=5
-elapsed=0
+# Wait for PostgreSQL to start
+log "Waiting for PostgreSQL to start"
 
-while ! docker ps --filter "name={{ postgres_service_name }}" --filter "health=healthy" --format '{% raw %}{{.Names}}{% endraw %}' | grep -q .; do
-    echo -n "."
-    sleep $interval
-    elapsed=$((elapsed + interval))
-    if [ $elapsed -ge $timeout ]; then
-        log "PostgreSQL container did not start in $timeout seconds" "ERROR"
-        log "Check logs with: docker service logs {{ postgres_service_name }}" "ERROR"
-        exit 1
-    fi
+CONTAINER_ID=$(docker ps -q -f name={{ postgres_service_name }})
+while true; do
+  if docker exec "$CONTAINER_ID" pg_isready -U postgres; then
+    break
+  fi
+  log "PostgreSQL is not ready yet, waiting..."
+  sleep 2
 done
-echo  # New line after progress dots
 
 log "PostgreSQL is up"
 log "Restore completed successfully!"
-
-# Wait a bit before cleaning up recovery files
-sleep 5
 
 log "Removing recovery files and configuration"
 docker run --rm \
@@ -262,10 +249,11 @@ docker run --rm \
 
 log "Restoring normal health check timeouts"
 docker service update \
-    --health-interval 5s \
-    --health-timeout 2s \
-    --health-retries 5 \
-    --health-start-period 10s \
+    --health-cmd="pg_isready -U postgres" \
+    --health-interval=5s \
+    --health-timeout=2s \
+    --health-retries=5 \
+    --health-start-period=10s \
     --force \
     {{ postgres_service_name }}
 
