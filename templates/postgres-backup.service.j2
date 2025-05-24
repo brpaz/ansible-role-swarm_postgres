@@ -6,6 +6,9 @@ Wants=postgres-backup.timer
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/pg-backup.sh
+{% if postgres_backup_ping_url | length > 0 %}
+ExecStartPost=/usr/bin/curl -fsS -m 10 --retry 5 -o /dev/null {{ postgres_backup_ping_url }}
+{% endif %}
 User=root
 Group=root
 Nice=19

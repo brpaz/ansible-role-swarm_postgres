@@ -1,3 +1,4 @@
+# filepath: /home/bruno/Code/Personal/ansible-role-swarm-postgres/tasks/container.yml
 ---
 # Tasks related to Docker container deployment
 
@@ -7,29 +8,54 @@
     driver: local
     state: present
 
-- name: Create wal archive volume
-  community.docker.docker_volume:
-    name: postgres_wal
-    driver: local
-    state: present
+- name: Set WAL-G environment variables when WAL-G is enabled
+  ansible.builtin.set_fact:
+    walg_env_vars: >-
+      {
+        'PGHOST': '127.0.0.1',
+        'PGUSER': 'postgres',
+        'PGPASSWORD': '{{ postgres_root_password }}',
+        'WALG_COMPRESSION_METHOD': '{{ postgres_walg_compression_method }}',
+        'WALG_COMPRESSION_LEVEL': '{{ postgres_walg_compression_level }}',
+        'WALG_S3_PREFIX': '{{ postgres_walg_s3_prefix }}',
+        'AWS_ACCESS_KEY_ID': '{{ postgres_walg_aws_access_key_id }}',
+        'AWS_SECRET_ACCESS_KEY': '{{ postgres_walg_aws_secret_access_key }}',
+        'AWS_REGION': '{{ postgres_walg_aws_region }}'
+        {% if postgres_walg_aws_endpoint != "" %}
+        , 'AWS_ENDPOINT': '{{ postgres_walg_aws_endpoint }}'
+        {% endif %}
+      }
+  when: postgres_walg_enabled | bool
+
+- name: Ensure WAL-G environment variables are empty when WAL-G is disabled
+  ansible.builtin.set_fact:
+    walg_env_vars: {}
+  when: not postgres_walg_enabled | bool
+
+- name: Combine all environment variables
+  ansible.builtin.set_fact:
+    postgres_env: "{{ postgres_environment | combine({'POSTGRES_PASSWORD': postgres_root_password }) | combine(walg_env_vars) }}"
 
 - name: Create swarm service
   community.docker.docker_swarm_service:
     name: "{{ postgres_service_name }}"
     state: present
+    command:
+      - "docker-entrypoint.sh"
+      - "postgres"
+      - "-c"
+      - "config_file={{ postgres_config_file_path }}"
     image: "{{ postgres_image }}:{{ postgres_version }}"
     mounts:
       - type: volume
         source: postgres_data
         target: /var/lib/postgresql/data
-      - type: volume
-        source: postgres_wal
-        target: /var/lib/postgresql/wal
       - type: bind
         source: /etc/postgres
         target: /etc/postgresql
+        readonly: true
     networks: "{{ postgres_networks }}"
-    env: "{{ postgres_environment | combine({'POSTGRES_PASSWORD': postgres_root_password }) }}"
+    env: "{{ postgres_env }}"
     publish:
       - published_port: "{{ postgres_port }}"
         target_port: 5432
@@ -47,9 +73,9 @@
       start_period: 10s
 
 - name: Wait for service to be in healthy state
-  ansible.builtin.command: docker ps --filter "name=postgres" --format {% raw %}"{{.Status}}"{% endraw %}
+  ansible.builtin.command: docker ps --filter "name={{ postgres_service_name }}" --format {% raw %}"{{.Status}}"{% endraw %}
   register: container_status
   until: "'healthy' in container_status.stdout"
   retries: 10
-  delay: 5
+  delay: 10
   changed_when: false

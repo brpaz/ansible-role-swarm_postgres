@@ -1,0 +1,22 @@
+[Unit]
+Description=WAL-G Base Backup for PostgreSQL
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/bin/walg-backup.sh
+{% if postgres_walg_backup_ping_url | length > 0 %}
+ExecStartPost=/usr/bin/curl -fsS -m 10 --retry 5 -o /dev/null {{ postgres_walg_backup_ping_url }}
+{% endif %}
+StandardOutput=journal
+StandardError=journal
+# Add restart on failure with backoff
+Restart=on-failure
+RestartSec=30s
+# Add timeout to prevent hanging backups
+TimeoutStartSec=3600s
+
+[Install]
+WantedBy=multi-user.target

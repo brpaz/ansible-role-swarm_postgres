@@ -1,0 +1,50 @@
+#!/bin/bash
+# WAL-G Retention Policy Script
+# This script is managed by Ansible - manual changes will be overwritten
+
+# Load WAL-G environment variables
+source /etc/postgres/walg/walg-env
+
+# Current timestamp for logging
+timestamp() {
+  date "+%Y-%m-%d %H:%M:%S"
+}
+
+log() {
+  echo "[$(timestamp)] $1"
+}
+
+# Get container ID from swarm service
+POSTGRES_CONTAINER=$(docker ps --filter "name={{ postgres_service_name }}" --format "{% raw %}{{.ID}}{% endraw %}")
+
+if [ -z "$POSTGRES_CONTAINER" ]; then
+  log "ERROR: PostgreSQL container not found"
+  exit 1
+fi
+
+log "Found PostgreSQL container: $POSTGRES_CONTAINER"
+
+# Apply count-based retention policy
+log "Applying count-based retention policy (keeping {{ postgres_walg_backup_retention_count }} backups)"
+docker exec -i "$POSTGRES_CONTAINER" bash -c "wal-g delete retain {{ postgres_walg_backup_retention_count }} --confirm"
+retention_result=$?
+
+if [ $retention_result -eq 0 ]; then
+  log "Count-based retention policy applied successfully"
+else
+  log "WARNING: Count-based retention policy failed with exit code $retention_result"
+fi
+
+# Clean up orphaned WAL files
+log "Cleaning up orphaned WAL files"
+docker exec -i "$POSTGRES_CONTAINER" bash -c "wal-g delete garbage --confirm"
+wal_cleanup_result=$?
+
+if [ $wal_cleanup_result -eq 0 ]; then
+  log "WAL file cleanup completed successfully"
+else
+  log "WARNING: WAL file cleanup failed with exit code $wal_cleanup_result"
+fi
+
+log "WAL-G retention policy execution completed"
+exit 0

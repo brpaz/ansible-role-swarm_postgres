@@ -1,0 +1,25 @@
+[Unit]
+Description=WAL-G Retention Policy for PostgreSQL
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+Environment=PGHOST=127.0.0.1
+Environment=PGUSER=postgres
+Environment=PGPASSWORD={{ postgres_root_password }}
+ExecStart=/usr/local/bin/walg-retention.sh
+{% if postgres_walg_retention_ping_url | length > 0 %}
+ExecStartPost=/usr/bin/curl -fsS -m 10 --retry 5 -o /dev/null {{ postgres_walg_retention_ping_url }}
+{% endif %}
+StandardOutput=journal
+StandardError=journal
+# Add restart on failure with backoff
+Restart=on-failure
+RestartSec=30s
+# Add timeout to prevent hanging retention operations
+TimeoutStartSec=1800s
+
+[Install]
+WantedBy=multi-user.target

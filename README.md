@@ -1,6 +1,6 @@
 # Ansible Docker Swarm PostgreSQL Role
 
-> An Ansible role to deploy a PostgreSQL service to a Docker Swarm cluster with support for user management, database creation, and pg_dump backups with rclone remote storage.
+> An Ansible role to deploy a PostgreSQL service to a Docker Swarm cluster with support for user management, database creation, pg_dump backups with rclone remote storage, and WAL-G continuous archiving with S3/Backblaze B2 for point-in-time recovery.
 
 ## Requirements
 
@@ -119,6 +119,29 @@ postgres_users:
 
 ### Backup Configuration
 
+#### WAL-G Backup Settings
+
+The role uses a custom PostgreSQL Docker image that includes WAL-G, a tool that provides continuous archiving of PostgreSQL WAL (Write-Ahead Logging) files and base backups.
+
+| Variable                                   | Default Value    | Description                                          |
+| ------------------------------------------ | ---------------- | ---------------------------------------------------- |
+| `postgres_walg_enabled`                    | `false`          | Whether to enable WAL-G backups                      |
+| `postgres_walg_s3_prefix`                  | ``               | S3 prefix URL (s3://bucket/path)                     |
+| `postgres_walg_compression_method`         | `lz4`            | Compression method (lz4, brotli, zstd, none)         |
+| `postgres_walg_compression_level`          | `3`              | Compression level                                    |
+| `postgres_walg_base_backup_timer_schedule` | `*-*-* 01:00:00` | When to take full backups (systemd calendar format)  |
+| `postgres_walg_retention_timer_schedule`   | `*-*-* 01:30:00` | When to run retention jobs (systemd calendar format) |
+| `postgres_walg_backup_retention_count`     | `5`              | How many backups to keep                             |
+
+##### S3 Storage Configuration
+
+| Variable                              | Default Value | Description                                         |
+| ------------------------------------- | ------------- | --------------------------------------------------- |
+| `postgres_walg_aws_access_key_id`     | ``            | AWS access key ID                                   |
+| `postgres_walg_aws_secret_access_key` | ``            | AWS secret access key                               |
+| `postgres_walg_aws_region`            | ``            | AWS region                                          |
+| `postgres_walg_aws_endpoint`          | ``            | S3-compatible endpoint URL (for Backblaze B2, etc.) |
+
 #### pg_dump Backup Settings
 
 | Variable                         | Default Value           | Description                                   |
@@ -194,83 +217,134 @@ To restore a database from a remote backup:
    psql -h localhost -p 5432 -U postgres -d dbname -f /local/path/filename.sql
    ```
 
-## Example Playbook
+#### Continuous Archiving with WAL-G
+
+WAL-G provides continuous archiving of PostgreSQL's Write-Ahead Log (WAL) files in addition to performing full backups. This enables point-in-time recovery (PITR) capabilities.
+
+##### How WAL-G Backups Work
+
+1. **WAL Archiving**: When `postgres_wal_enabled` is set to `true`, PostgreSQL is configured to archive WAL files using WAL-G.
+2. **Base Backups**: WAL-G performs full backups according to the schedule defined in `postgres_walg_base_backup_timer_schedule`.
+3. **Continuous Backup**: Between full backups, WAL files are continuously archived, allowing for point-in-time recovery.
+4. **Retention Policies**: Old backups are automatically removed based on retention settings. The retention service uses both count-based (`postgres_walg_backup_retention_count`)
+##### Prerequisites for WAL-G
+
+- PostgreSQL configuration with WAL archiving enabled (`postgres_wal_enabled: true`)
+- Appropriate storage configuration (S3, Azure, GCS, or filesystem)
+- Access credentials for the chosen storage provider
+
+##### Example WAL-G Configuration with S3
 
 ```yaml
-- hosts: postgres_servers
-  vars:
-    postgres_version: "17.4"
-    postgres_root_password: "supersecurepassword"
-    postgres_max_connections: 200
-    postgres_shared_buffers: "512MB"
-    postgres_custom_conf:
-      max_worker_processes: 8
-      work_mem: "8MB"
-
-    # Database and user creation
-    postgres_databases:
-      - name: myapp_db
-        owner: myapp_user
-        encoding: UTF8
-      - name: analytics_db
-
-    postgres_users:
-      - name: myapp_user
-        password: "app_password"
-        roles: ["CREATEDB", "LOGIN"]
-        privileges:
-          - database: myapp_db
-            schema: public
-            type: ALL
-            privileges: ALL
-      - name: readonly_user
-        password: "read_password"
-        privileges:
-          - database: myapp_db
-            schema: public
-            type: TABLE
-            privileges: SELECT
-
-    # Enable pg_dump backups
-    postgres_backup_enabled: true
-    postgres_backup_dir: "/opt/backups/postgres"
-    postgres_backup_keep_days: 14
-    postgres_backup_hour: "03"
-    postgres_backup_minute: "30"
-    postgres_backup_prune_enabled: true
-
-    # Enable rclone remote backups (optional)
-    postgres_backup_rclone_enabled: true
-    postgres_backup_rclone_remote: "remote:postgres_backups"
-    postgres_backup_rclone_args: "--progress"
-
-  roles:
-    - brpaz.swarm_postgres
+# Enable WAL-G backups with S3 storage
+postgres_wal_enabled: true
+postgres_archive_mode: "on"
+postgres_archive_command: "wal-g wal-push %p"
+postgres_walg_enabled: true
+postgres_walg_s3_prefix: "s3://my-pg-backups/postgres"
+postgres_walg_aws_access_key_id: "YOUR_ACCESS_KEY"
+postgres_walg_aws_secret_access_key: "YOUR_SECRET_KEY"
+postgres_walg_aws_region: "us-east-1"
+postgres_walg_base_backup_timer_schedule: "*-*-* 01:00:00"  # Daily at 1 AM (systemd calendar format)
+postgres_walg_retention_timer_schedule: "*-*-* 01:30:00"  # Daily at 1:30 AM (systemd calendar format)
+postgres_walg_backup_retention_count: 10
 ```
 
-## Role Dependencies
+##### Example WAL-G Configuration with Backblaze B2
 
-- [community.docker](https://docs.ansible.com/ansible/latest/collections/community/docker/index.html) collection
-- [community.postgresql](https://docs.ansible.com/ansible/latest/collections/community/postgresql/index.html) collection
+```yaml
+# Enable WAL-G backups with Backblaze B2 storage
+postgres_wal_enabled: true
+postgres_archive_mode: "on"
+postgres_archive_command: "wal-g wal-push %p"
+postgres_walg_enabled: true
+postgres_walg_s3_prefix: "s3://my-bucket/postgres-backups"
+postgres_walg_aws_access_key_id: "YOUR_BACKBLAZE_KEY_ID"
+postgres_walg_aws_secret_access_key: "YOUR_BACKBLAZE_APPLICATION_KEY"
+postgres_walg_aws_region: "us-west-001"
+postgres_walg_aws_endpoint: "https://s3.us-west-001.backblazeb2.com"
+postgres_walg_base_backup_timer_schedule: "*-*-* 01:00:00"  # Daily at 1 AM (systemd calendar format)
+postgres_walg_retention_timer_schedule: "*-*-* 01:30:00"  # Daily at 1:30 AM (systemd calendar format)
+postgres_walg_backup_retention_count: 7
+```
 
-## Contribute
+##### Restoring from WAL-G Backups
 
-All contributions are welcome. Please check [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
+The role installs a restore script at `/usr/local/bin/walg-restore.sh` that can be used to restore a database from WAL-G backups.
 
-## 🫶 Support
+To restore the latest backup:
+```bash
+sudo /usr/local/bin/walg-restore.sh --latest
+```
 
-If you find this project helpful and would like to support its development, there are a few ways you can contribute:
+To restore a specific backup:
+```bash
+sudo /usr/local/bin/walg-restore.sh --backup-name base_000000010000000000000007
+```
 
-[![Sponsor me on GitHub](https://img.shields.io/badge/Sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=red&&style=for-the-badge&labelColor=white)](https://github.com/sponsors/brpaz)
+To restore to a specific point in time:
+```bash
+sudo /usr/local/bin/walg-restore.sh --target-time "2023-06-15 14:30:00"
+```
 
-<a href="https://www.buymeacoffee.com/Z1Bu6asGV" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: auto !important;width: auto !important;" ></a>
+To perform a dry run without actually executing the restore:
+```bash
+sudo /usr/local/bin/walg-restore.sh --dry-run --latest
+```
 
-## License
+##### Monitoring WAL-G Backups
 
-This project is MIT Licensed [LICENSE](LICENSE)
+The role installs a monitoring script at `/usr/local/bin/walg-monitor.sh` that can be used to check the status and health of your WAL-G backups.
 
-## 📩 Contact
+To list all backups:
+```bash
+sudo /usr/local/bin/walg-monitor.sh --list
+```
 
-✉️ **Email** - [oss@brunopaz.dev](oss@brunopaz.dev)
+To show detailed information about backups:
+```bash
+sudo /usr/local/bin/walg-monitor.sh --detail
+```
 
-🖇️ **Source code**: [https://github.com/brpaz/ansible-role-swarm-postgres](https://github.com/brpaz/ansible-role-swarm-postgres)
+To check backup status and health:
+```bash
+sudo /usr/local/bin/walg-monitor.sh --status
+```
+
+This monitoring script can be integrated with your monitoring systems like [NTFY](https://ntfy.sh) to ensure your backups are being executed correctly.
+
+##### WAL-G Backup Retention Management
+
+The role implements a dual retention policy system that ensures your backups are managed efficiently:
+
+1. **Count-based retention**: Keeps a fixed number of the most recent backups (`postgres_walg_backup_retention_count`)
+
+The role installs a dedicated retention script at `/usr/local/bin/walg-retention.sh` that handles backup cleanup. The script:
+
+- Applies both retention policies independently (count-based and time-based)
+- Provides detailed logging of the retention process
+- Continues execution even if one retention policy fails
+- Shows a summary of remaining backups after cleanup
+
+The retention service runs on a schedule defined by `postgres_walg_retention_timer_schedule` (default: daily at 1:30 AM) and includes:
+
+- **Resilient execution**: If one retention policy fails, the other will still be applied
+- **Error handling**: Failures are logged but won't prevent the service from functioning
+- **Auto-recovery**: Includes restart capabilities to handle temporary failures
+- **Timeout protection**: Prevents hanging operations with a configurable timeout
+
+You can manually trigger the retention process by running:
+```bash
+sudo systemctl start walg-retention.service
+```
+
+Or run the script directly:
+```bash
+sudo /usr/local/bin/walg-retention.sh
+```
+
+To see the retention status and logs:
+```bash
+sudo journalctl -u walg-retention.service -n 50
+```
+````

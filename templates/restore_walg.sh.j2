@@ -1,0 +1,264 @@
+#!/bin/bash
+# WAL-G Restore Script
+# Managed by Ansible - manual changes will be overwritten
+
+set -euo pipefail
+
+trap 'catch' ERR
+
+catch() {
+    local exit_code=$?
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] ERROR: An error occurred during the restore process. Exit code: $exit_code"
+
+    if [[ -f /tmp/walg-env-docker ]]; then
+        echo "[$timestamp] Cleaning up temporary environment file"
+        rm -f /tmp/walg-env-docker
+    fi
+
+    if [[ -n "${RESTORE_IN_PROGRESS:-}" ]]; then
+        echo "[$timestamp] WARNING: Restore was interrupted. Database may be in an inconsistent state."
+    fi
+
+    exit $exit_code
+}
+
+verify_backup() {
+    local backup_name=$1
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+
+    echo "[$timestamp] Verifying backup integrity..."
+    if ! docker run --rm \
+        --env-file /tmp/walg-env-docker \
+        {{ postgres_image }}:{{ postgres_version }} \
+        wal-g backup-list 2>&1 | grep -q "^$backup_name"; then
+        echo "[$timestamp] ERROR: Backup '$backup_name' not found"
+        exit 1
+    fi
+}
+
+get_backup_size() {
+    local backup_name=$1
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+
+    echo "[$timestamp] Retrieving backup size..."
+    docker run --rm \
+        --env-file /tmp/walg-env-docker \
+        {{ postgres_image }}:{{ postgres_version }} \
+        wal-g backup-list --detail 2>/dev/null | grep "^$backup_name" | awk '{print $2}'
+}
+
+validate_time_format() {
+    local time_str=$1
+    if ! date -d "$time_str" >/dev/null 2>&1; then
+        echo "ERROR: Invalid time format. Please use 'YYYY-MM-DD HH:MM:SS' format"
+        exit 1
+    fi
+}
+
+show_help() {
+    cat <<EOF
+Usage: $0 [options]
+WAL-G restore script for PostgreSQL
+
+Options:
+  -b, --backup-name NAME    Restore specific backup (e.g. base_000000010000000000000007)
+  -l, --latest              Restore latest backup (default)
+  -t, --target-time TIME    Restore to specific point in time (e.g. '2023-06-15 14:30:00')
+  -d, --dry-run             Print actions without executing
+  -h, --help                Show this help message
+
+Examples:
+  $0 -l
+  $0 -b base_000000010000000000000007
+  $0 -t '2023-06-15 14:30:00'
+  $0 -d -b base_000000010000000000000007
+EOF
+}
+
+RESTORE_LATEST=true
+BACKUP_NAME=""
+TARGET_TIME=""
+DRY_RUN=false
+SKIP_CONFIRM=false
+PG_DATA_DIR="/var/lib/postgresql/data"
+RECOVERY_CONF_FILE="${PG_DATA_DIR}/recovery.conf"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -b|--backup-name) BACKUP_NAME="$2"; RESTORE_LATEST=false; shift 2 ;;
+        -l|--latest) RESTORE_LATEST=true; shift ;;
+        -t|--target-time) TARGET_TIME="$2"; RESTORE_LATEST=false; shift 2 ;;
+        -d|--dry-run) DRY_RUN=true; shift ;;
+        -y|--yes) SKIP_CONFIRM=true; shift ;;
+        -h|--help) show_help; exit 0 ;;
+        *) echo "Unknown option: $1"; show_help; exit 1 ;;
+    esac
+done
+
+if [[ -n "$TARGET_TIME" ]]; then
+    validate_time_format "$TARGET_TIME"
+fi
+
+source /etc/postgres/walg/walg-env
+
+# Format the environment variables for Docker
+sed -E 's/^export //; s/^([^=]+)="(.*)"$/\1=\2/' /etc/postgres/walg/walg-env > /tmp/walg-env-docker
+
+TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+echo "[$TIMESTAMP] Available backups:"
+docker run --rm \
+    --env-file /tmp/walg-env-docker \
+    {{ postgres_image }}:{{ postgres_version }} \
+    wal-g backup-list --detail
+
+# Determine which backup to use
+if $RESTORE_LATEST; then
+    BACKUP_NAME=$(docker run --rm \
+        --env-file /tmp/walg-env-docker \
+        {{ postgres_image }}:{{ postgres_version }} \
+        wal-g backup-list | tail -n1)
+    echo "[$TIMESTAMP] Latest backup is: $BACKUP_NAME"
+fi
+
+if [[ -n "$BACKUP_NAME" ]]; then
+    verify_backup "$BACKUP_NAME"
+    BACKUP_SIZE=$(get_backup_size "$BACKUP_NAME")
+    echo "[$TIMESTAMP] Backup size: $BACKUP_SIZE"
+fi
+
+if ! $DRY_RUN; then
+    if ! $SKIP_CONFIRM; then
+        read -p "[$TIMESTAMP] This will DESTROY all data in the current database. Are you sure? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "[$TIMESTAMP] Operation cancelled"
+            exit 1
+        fi
+    fi
+fi
+
+if $DRY_RUN; then
+    echo "[$TIMESTAMP] DRY RUN: Actions to be performed:"
+    echo "- Stop PostgreSQL service"
+    echo "- Clean data directory"
+    if $RESTORE_LATEST; then
+        echo "- Restore latest backup ($BACKUP_NAME)"
+    elif [[ -n "$BACKUP_NAME" ]]; then
+        echo "- Restore backup '$BACKUP_NAME'"
+    elif [[ -n "$TARGET_TIME" ]]; then
+        echo "- Restore to point-in-time: $TARGET_TIME"
+        echo "- Configure recovery settings"
+    fi
+    echo "- Create recovery.signal"
+    echo "- Start PostgreSQL service"
+    exit 0
+fi
+
+echo "[$TIMESTAMP] Stopping PostgreSQL service"
+docker service scale {{ postgres_service_name }}=0
+sleep 5
+
+# Verify service is stopped
+while docker service ls | grep -q "{{ postgres_service_name }} "; do
+    echo "[$TIMESTAMP] Waiting for service to stop completely..."
+    sleep 2
+done
+
+echo "[$TIMESTAMP] Cleaning data directory"
+
+# Get docker volume path
+PGDATA_VOLUME_PATH=$(docker volume inspect postgres_data --format '{% raw %}{{ .Mountpoint }}{% endraw %}')
+
+if [[ -z "$PGDATA_VOLUME_PATH" ]]; then
+    echo "[$TIMESTAMP] ERROR: Unable to find PostgreSQL data volume"
+    exit 1
+fi
+
+rm -rf "${PGDATA_VOLUME_PATH:?}"/*
+
+echo "[$TIMESTAMP] Starting restore process"
+RESTORE_IN_PROGRESS=1
+RESTORE_CMD="wal-g backup-fetch ${PG_DATA_DIR}"
+
+if $RESTORE_LATEST || [[ -n "$BACKUP_NAME" ]]; then
+    RESTORE_CMD="$RESTORE_CMD ${BACKUP_NAME:-LATEST}"
+else
+    RESTORE_CMD="$RESTORE_CMD LATEST"
+fi
+
+# Start restore with progress monitoring
+docker run --rm \
+    -v postgres_data:${PG_DATA_DIR} \
+    -v /etc/postgres:/etc/postgresql \
+    --env-file /tmp/walg-env-docker \
+    {{ postgres_image }}:{{ postgres_version }} \
+    sh -c "$RESTORE_CMD" &
+
+RESTORE_PID=$!
+
+while kill -0 $RESTORE_PID 2>/dev/null; do
+    echo -n "[$TIMESTAMP] Restore in progress..."
+    sleep 5
+    TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+done
+
+wait $RESTORE_PID
+unset RESTORE_IN_PROGRESS
+
+# Write recovery config
+echo "[$TIMESTAMP] Writing restore configuration"
+docker run --rm \
+    -v postgres_data:${PG_DATA_DIR} \
+    {{ postgres_image }}:{{ postgres_version }} \
+    sh -c 'echo "restore_command = '\''wal-g wal-fetch \"%f\" \"%p\"'\''" > ${RECOVERY_CONF_FILE} && \
+           if [ -n "${TARGET_TIME}" ]; then
+               echo "recovery_target_time = '\''${TARGET_TIME}'\''" >> ${RECOVERY_CONF_FILE}
+               echo "recovery_target_action = '\''promote'\''" >> ${RECOVERY_CONF_FILE}
+           fi'
+
+echo "[$TIMESTAMP] Creating recovery.signal"
+docker run --rm \
+    -v postgres_data:${PG_DATA_DIR} \
+    {{ postgres_image }}:{{ postgres_version }} \
+    sh -c "touch ${PG_DATA_DIR}/recovery.signal"
+
+echo "[$TIMESTAMP] Starting PostgreSQL service"
+docker service scale {{ postgres_service_name }}=1
+
+echo "[$TIMESTAMP] Waiting for PostgreSQL to start"
+timeout=120  # Increased timeout for larger databases
+interval=2
+elapsed=0
+
+while ! docker ps --filter "name={{ postgres_service_name }}" --filter "health=healthy" --format '{% raw %}{{.Names}}{% endraw %}' | grep -q .; do
+    echo -n "."
+    sleep $interval
+    elapsed=$((elapsed + interval))
+    if [ $elapsed -ge $timeout ]; then
+        echo "[$TIMESTAMP] ERROR: PostgreSQL service did not become healthy in $timeout seconds"
+        echo "[$TIMESTAMP] Check logs with: docker service logs {{ postgres_service_name }}"
+        exit 1
+    fi
+done
+echo  # New line after progress dots
+
+echo "[$TIMESTAMP] PostgreSQL is up"
+echo "[$TIMESTAMP] Restore completed successfully!"
+
+# Wait a bit before cleaning up recovery files
+sleep 5
+
+echo "[$TIMESTAMP] Removing recovery files"
+docker run --rm \
+    -v postgres_data:${PG_DATA_DIR} \
+    {{ postgres_image }}:{{ postgres_version }} \
+    sh -c "rm -f ${RECOVERY_CONF_PATH} ${PG_DATA_DIR}/recovery.signal"
+
+echo "[$TIMESTAMP] Forcing service update to apply new configuration"
+docker service update --force {{ postgres_service_name }}
+
+echo "[$TIMESTAMP] Restore process complete!"
+
+
+

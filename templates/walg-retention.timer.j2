@@ -1,0 +1,12 @@
+[Unit]
+Description=WAL-G Retention Policy Timer for PostgreSQL
+After=network.target
+
+[Timer]
+# Run at the scheduled retention time
+OnCalendar={{ postgres_walg_retention_timer_schedule }}
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

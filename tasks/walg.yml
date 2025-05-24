@@ -1,0 +1,112 @@
+---
+# Tasks for WAL-G backup and restore configuration
+
+- name: Create WAL-G environment file directory
+  ansible.builtin.file:
+    path: /etc/postgres/walg
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
+
+- name: Create WAL-G environment file
+  ansible.builtin.template:
+    src: walg-env.j2
+    dest: /etc/postgres/walg/walg-env
+    owner: root
+    group: root
+    mode: "0640"
+  become: true
+
+- name: Install WAL-G backup script
+  ansible.builtin.template:
+    src: backup_walg.sh.j2
+    dest: /usr/local/bin/walg-backup.sh
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+
+- name: Install WAL-G restore script
+  ansible.builtin.template:
+    src: restore_walg.sh.j2
+    dest: /usr/local/bin/walg-restore.sh
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+
+- name: Install WAL-G monitoring script
+  ansible.builtin.template:
+    src: monitor_walg.sh.j2
+    dest: /usr/local/bin/walg-monitor.sh
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+
+- name: Install WAL-G retention script
+  ansible.builtin.template:
+    src: retention_walg.sh.j2
+    dest: /usr/local/bin/walg-retention.sh
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+
+- name: Install systemd service for WAL-G backup
+  ansible.builtin.template:
+    src: walg-backup.service.j2
+    dest: /etc/systemd/system/walg-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Install systemd timer for WAL-G backup
+  ansible.builtin.template:
+    src: walg-backup.timer.j2
+    dest: /etc/systemd/system/walg-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: postgres_walg_base_backup_timer_enabled | bool
+
+- name: Enable and start WAL-G backup timer
+  ansible.builtin.systemd:
+    name: walg-backup.timer
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: true
+  when: postgres_walg_base_backup_timer_enabled | bool
+
+- name: Install systemd service for WAL-G retention policy
+  ansible.builtin.template:
+    src: walg-retention.service.j2
+    dest: /etc/systemd/system/walg-retention.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Install systemd timer for WAL-G retention policy
+  ansible.builtin.template:
+    src: walg-retention.timer.j2
+    dest: /etc/systemd/system/walg-retention.timer
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: postgres_walg_retention_timer_enabled | bool
+
+- name: Enable and start WAL-G retention timer
+  ansible.builtin.systemd:
+    name: walg-retention.timer
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: true
+  when: postgres_walg_retention_timer_enabled | bool

@@ -1,0 +1,138 @@
+#!/bin/bash
+# WAL-G Backup Monitoring Script
+# This script is managed by Ansible - manual changes will be overwritten
+
+# Load environment variables
+source /etc/postgres/walg/walg-env
+
+# Usage info
+show_help() {
+    echo "Usage: $0 [options]"
+    echo "WAL-G backup monitoring script for PostgreSQL"
+    echo ""
+    echo "Options:"
+    echo "  -l, --list                List all backups"
+    echo "  -d, --detail              Show detailed information about backups"
+    echo "  -s, --status              Check backup status and health"
+    echo "  -h, --help                Display this help message"
+    echo ""
+    echo "Example:"
+    echo "  $0 -l                     # List all backups"
+    echo "  $0 -d                     # Show detailed information"
+    echo "  $0 -s                     # Check backup status and health"
+}
+
+# Default values
+LIST_BACKUPS=false
+SHOW_DETAIL=false
+CHECK_STATUS=false
+
+# Parse command line options
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -l|--list)
+            LIST_BACKUPS=true
+            shift
+            ;;
+        -d|--detail)
+            SHOW_DETAIL=true
+            shift
+            ;;
+        -s|--status)
+            CHECK_STATUS=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+# If no options provided, show help
+if [[ "$LIST_BACKUPS" == "false" && "$SHOW_DETAIL" == "false" && "$CHECK_STATUS" == "false" ]]; then
+    show_help
+    exit 0
+fi
+
+# Current timestamp for logging
+TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+
+POSTGRES_CONTAINER=$(docker ps --filter "name={{ postgres_service_name }}" --format "{% raw %}{{.ID}}{% endraw %}")
+
+if [ -z "$POSTGRES_CONTAINER" ]; then
+    echo "ERROR: PostgreSQL container not found"
+    exit 1
+fi
+
+# List backups
+if [ "$LIST_BACKUPS" = true ]; then
+    echo "[$TIMESTAMP] Listing WAL-G backups:"
+    docker exec -i ${POSTGRES_CONTAINER} bash -c "wal-g backup-list"
+fi
+
+# Show detailed information
+if [ "$SHOW_DETAIL" = true ]; then
+
+    echo "[$TIMESTAMP] WAL-G detailed backup information:"
+    # Get the latest backup name
+    LATEST_BACKUP=$(docker exec -i ${POSTGRES_CONTAINER} bash -c "wal-g backup-list | tail -n 1 | awk '{print \$1}'")
+
+    if [ -z "$LATEST_BACKUP" ]; then
+        echo "No backups found."
+    else
+        echo "Latest backup: $LATEST_BACKUP"
+        echo "Backup details:"
+        docker exec -i ${POSTGRES_CONTAINER} bash -c "wal-g backup-list --detail"
+
+        echo "WAL segments:"
+        docker exec -i ${POSTGRES_CONTAINER} bash -c "wal-g wal-show"
+    fi
+fi
+
+# Check backup status and health
+if [ "$CHECK_STATUS" = true ]; then
+
+    echo "[$TIMESTAMP] Checking WAL-G backup status:"
+
+    # Count total backups
+    BACKUP_COUNT=$(docker exec -i ${POSTGRES_CONTAINER} bash -c "wal-g backup-list | wc -l")
+    echo "Total backups: $BACKUP_COUNT"
+
+    if [ "$BACKUP_COUNT" -gt 0 ]; then
+        # Get the latest backup timestamp
+        LATEST_BACKUP=$(docker exec -i ${POSTGRES_CONTAINER} bash -c "wal-g backup-list | tail -n 1")
+        LATEST_BACKUP_NAME=$(echo "$LATEST_BACKUP" | awk '{print $1}')
+        LATEST_BACKUP_TIME=$(echo "$LATEST_BACKUP" | awk '{print $2, $3}')
+
+        echo "Latest backup: $LATEST_BACKUP_NAME at $LATEST_BACKUP_TIME"
+
+        # Calculate time since last backup
+        LATEST_BACKUP_SECONDS=$(date -d "$LATEST_BACKUP_TIME" +%s)
+        CURRENT_SECONDS=$(date +%s)
+        SECONDS_SINCE_BACKUP=$((CURRENT_SECONDS - LATEST_BACKUP_SECONDS))
+        HOURS_SINCE_BACKUP=$((SECONDS_SINCE_BACKUP / 3600))
+
+        echo "Time since last backup: $HOURS_SINCE_BACKUP hours"
+
+        # Check if backup is older than 24 hours
+        if [ "$HOURS_SINCE_BACKUP" -gt 24 ]; then
+            echo "WARNING: Last backup is more than 24 hours old!"
+        else
+            echo "Backup age is within normal range."
+        fi
+
+        # Check for any backup failures in systemd journal
+        echo "Recent backup errors (if any):"
+        journalctl -u walg-backup.service --since "24 hours ago" | grep -i "error\|fail" || echo "No errors found in the last 24 hours."
+    else
+        echo "WARNING: No backups found! Please check your WAL-G configuration."
+    fi
+fi
+
+exit 0

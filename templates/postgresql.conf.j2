@@ -1,8 +1,9 @@
 # PostgreSQL configuration file
 # This file is managed by Ansible - manual changes will be overwritten
+# See https://github.com/postgres/postgres/blob/master/src/backend/utils/misc/postgresql.conf.sample for available settings
 
 # CONNECTION SETTINGS
-listen_addresses = '{{ postgres_listen_addresses | default("localhost") }}'
+listen_addresses = '*'
 port = {{ postgres_port }}
 max_connections = {{ postgres_max_connections }}
 
@@ -17,16 +18,17 @@ effective_cache_size = {{ postgres_effective_cache_size | default("4GB") }}
 wal_level = {{ postgres_wal_level | default("replica") }}
 max_wal_size = {{ postgres_wal_max_size }}
 min_wal_size = {{ postgres_wal_min_size }}
-archive_mode = {{ postgres_archive_mode }}
-archive_timeout = {{ postgres_archive_timeout }}
-{% if postgres_archive_command %}
+archive_mode = '{{ postgres_archive_mode }}'
 archive_command = '{{ postgres_archive_command }}'
-{% endif %}
 {% endif %}
 
 {% if postgres_custom_conf is defined %}
 # CUSTOM SETTINGS
 {% for setting, value in postgres_custom_conf.items() %}
-{{ setting }} = {{ value }}
+{{ setting }} = '{{ value }}'
 {% endfor %}
 {% endif %}
+
+# Optional include any recovery configuration file
+# This is useful for setting up replication or point-in-time recovery
+include_if_exists = '/var/lib/postgresql/data/recovery.conf'

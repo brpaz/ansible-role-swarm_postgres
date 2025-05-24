@@ -1,0 +1,38 @@
+#!/bin/bash
+# WAL-G Backup Script
+# This script is managed by Ansible - manual changes will be overwritten
+
+# Load environment variables
+source /etc/postgres/walg/walg-env
+
+# Current timestamp for logging
+TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+echo "[$TIMESTAMP] Starting WAL-G backup"
+
+# Create a base backup with WAL-G
+# Get container name from swarm service
+POSTGRES_CONTAINER=$(docker ps --filter "name={{ postgres_service_name }}" --format "{% raw %}{{.ID}}{% endraw %}")
+
+if [ -z "$POSTGRES_CONTAINER" ]; then
+  echo "ERROR: PostgreSQL container not found"
+  exit 1
+fi
+
+docker exec -i ${POSTGRES_CONTAINER} bash -c "wal-g backup-push /var/lib/postgresql/data"
+BACKUP_RESULT=$?
+
+# Check if backup was successful
+if [ $BACKUP_RESULT -eq 0 ]; then
+  TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+  echo "[$TIMESTAMP] WAL-G backup completed successfully"
+
+  # List available backups
+  echo "[$TIMESTAMP] Available backups:"
+  docker exec -i ${POSTGRES_CONTAINER} bash -c "wal-g backup-list"
+
+  exit 0
+else
+  TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+  echo "[$TIMESTAMP] WAL-G backup failed"
+  exit 1
+fi

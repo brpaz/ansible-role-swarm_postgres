@@ -13,6 +13,7 @@ postgres_environment: {}
 
 # Postgres configuration
 postgres_client_package: "postgresql-client-17"
+postgres_config_file_path: "/etc/postgresql/postgresql.conf"
 postgres_root_password: "postgres"
 postgres_max_connections: 100
 postgres_shared_buffers: "128MB"
@@ -22,12 +23,31 @@ postgres_port: 5432 # Added default port explicitly
 # WAL settings
 postgres_wal_enabled: false
 postgres_wal_level: "replica"
-postgres_wal_min_size: "80MB" # Fixed typo in variable name (was posgres_wal_min_size)
+postgres_wal_min_size: "80MB"
 postgres_wal_max_size: "1GB"
 postgres_archive_command: "wal-g wal-push %p"
 postgres_archive_mode: "on"
 
-postgres_archive_timeout: "60s"
+# WAL-G backup settings
+postgres_walg_enabled: false
+postgres_walg_s3_prefix: "" # Example: s3://bucket/path/to/folder
+postgres_walg_compression_method: "lz4" # Options: lz4, brotli, zstd, none
+postgres_walg_compression_level: "3"
+postgres_walg_base_backup_timer_enabled: true
+postgres_walg_base_backup_timer_schedule: "Sun *-*-* 02:00:00"
+postgres_walg_retention_timer_enabled: true
+postgres_walg_retention_timer_schedule: "Sun *-*-* 02:30:00"
+postgres_walg_backup_retention_count: 5 # Default: keep 5 backups
+
+# Health check settings
+postgres_walg_backup_ping_url: "" # URL to ping after successful backup (e.g., https://hc-ping.com/your-uuid)
+postgres_walg_retention_ping_url: "" # URL to ping after successful retention job
+
+# S3 credentials
+postgres_walg_aws_access_key_id: ""
+postgres_walg_aws_secret_access_key: ""
+postgres_walg_aws_region: ""
+postgres_walg_aws_endpoint: "" # Use for S3-compatible storage like Backblaze B2
 
 ## Users and databases to create
 # Format for databases:
@@ -69,3 +89,5 @@ postgres_backup_timer: "weekly" # Options: daily, weekly, monthly
 postgres_backup_format: "custom" # Options: plain, custom, directory, tar
 postgres_backup_compress: true
 postgres_backup_databases: [] # Empty means back up all databases
+postgres_backup_ping_url: "" # URL to ping after successful backup (e.g., https://hc-ping.com/your-uuid)
+postgres_backup_prune_ping_url: "" # URL to ping after successful pruning

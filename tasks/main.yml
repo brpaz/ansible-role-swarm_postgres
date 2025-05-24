@@ -5,6 +5,16 @@
 - name: Include setup tasks
   ansible.builtin.import_tasks: setup.yml
 
+# Configure backups (pg_dump)
+- name: Include backup configuration tasks
+  ansible.builtin.import_tasks: backup.yml
+  when: postgres_backup_enabled | bool
+
+# Configure WAL-G backups
+- name: Include WAL-G backup configuration tasks
+  ansible.builtin.import_tasks: walg.yml
+  when: postgres_walg_enabled | bool
+
 # Deploy PostgreSQL container in Docker Swarm
 - name: Include container deployment tasks
   ansible.builtin.import_tasks: container.yml
@@ -12,8 +22,3 @@
 # Create databases and users
 - name: Include database management tasks
   ansible.builtin.import_tasks: database.yml
-
-# Configure backups (pg_dump)
-- name: Include backup configuration tasks
-  ansible.builtin.import_tasks: backup.yml
-  when: postgres_backup_enabled | bool
