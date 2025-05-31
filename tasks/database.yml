@@ -16,7 +16,7 @@
 - name: Grant predefined roles to users
   community.postgresql.postgresql_query:
     query: "GRANT {{ item.roles | join(', ') }} TO {{ item.name }};"
-    db: postgres
+    database: postgres
     login_host: 127.0.0.1
     login_user: postgres
     login_password: "{{ postgres_root_password }}"
