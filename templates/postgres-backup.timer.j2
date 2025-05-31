@@ -3,7 +3,7 @@ Description=Timer for PostgreSQL Database Backup
 Requires=postgres-backup.service
 
 [Timer]
-OnCalendar={{ postgres_backup_timer | default("daily") }}
+OnCalendar={{ postgres_pgdump_timer | default("daily") }}
 Persistent=true
 
 [Install]

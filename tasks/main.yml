@@ -8,7 +8,7 @@
 # Configure backups (pg_dump)
 - name: Include backup configuration tasks
   ansible.builtin.import_tasks: backup.yml
-  when: postgres_backup_enabled | bool
+  when: postgres_pgdump_enabled | bool
 
 # Configure WAL-G backups
 - name: Include WAL-G backup configuration tasks

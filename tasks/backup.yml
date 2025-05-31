@@ -3,7 +3,7 @@
 
 - name: Ensure backup directory exists
   ansible.builtin.file:
-    path: "{{ postgres_backup_dir }}"
+    path: "{{ postgres_pgdump_dir }}"
     state: directory
     owner: root
     group: root
@@ -55,8 +55,8 @@
     mode: "0700"
   become: true
   when:
-    - postgres_backup_prune_enabled | bool
-    - not postgres_backup_rclone_enabled | bool
+    - postgres_pgdump_prune_enabled | bool
+    - not postgres_pgdump_rclone_enabled | bool
 
 - name: Install systemd service for PostgreSQL backup pruning
   ansible.builtin.template:
@@ -67,8 +67,8 @@
     mode: "0644"
   become: true
   when:
-    - postgres_backup_prune_enabled | bool
-    - not postgres_backup_rclone_enabled | bool
+    - postgres_pgdump_prune_enabled | bool
+    - not postgres_pgdump_rclone_enabled | bool
 
 - name: Install systemd timer for PostgreSQL backup pruning
   ansible.builtin.template:
@@ -79,8 +79,8 @@
     mode: "0644"
   become: true
   when:
-    - postgres_backup_prune_enabled | bool
-    - not postgres_backup_rclone_enabled | bool
+    - postgres_pgdump_prune_enabled | bool
+    - not postgres_pgdump_rclone_enabled | bool
 
 - name: Enable and start PostgreSQL backup pruning timer
   ansible.builtin.systemd:
@@ -90,5 +90,5 @@
     daemon_reload: true
   become: true
   when:
-    - postgres_backup_prune_enabled | bool
-    - not postgres_backup_rclone_enabled | bool
+    - postgres_pgdump_prune_enabled | bool
+    - not postgres_pgdump_rclone_enabled | bool
