@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v0.3.0 - 2025-05-31
+
+### What's Changed
+
+#### 🚀 Features
+
+- feat: improve role handling @brpaz (#2)
+  **Full Changelog**: [https://github.com/brpaz/ansible-role-swarm_postgres/compare/v0.2.0...v0.3.0](https://github.com/brpaz/ansible-role-swarm_postgres/compare/v0.2.0...v0.3.0)
+
 ## v0.2.0 - 2025-05-31
 
 ### What's Changed
