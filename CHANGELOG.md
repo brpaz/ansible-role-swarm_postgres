@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v0.4.0 - 2025-05-31
+
+### What's Changed
+
+#### 🚀 Features
+
+- fix: do not exit backup script with error if no databases to backup a… @brpaz (#4)
+  **Full Changelog**: [https://github.com/brpaz/ansible-role-swarm_postgres/compare/v0.3.1...v0.4.0](https://github.com/brpaz/ansible-role-swarm_postgres/compare/v0.3.1...v0.4.0)
+
 ## v0.3.1 - 2025-05-31
 
 ### What's Changed
