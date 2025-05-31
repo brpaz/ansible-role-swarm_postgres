@@ -124,8 +124,8 @@ if [ $DB_LIST_STATUS -ne 0 ]; then
     exit 1
 fi
 if [ -z "$DATABASES" ]; then
-    log_error "No databases found for backup"
-    exit 1
+    log_info "No databases found for backup"
+    exit 0
 fi
 log_info "Found databases: $DATABASES"
 {% endif %}
