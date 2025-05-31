@@ -109,13 +109,33 @@ Example user format:
 postgres_users:
   - name: app_user
     password: secure_password
-    roles: ["CREATEDB", "LOGIN"]  # Optional
-    privileges:  # Optional
+    # Role attributes (Optional) - These define the user's capabilities
+    role_attr_flags:
+      - "CREATEDB"
+      - "LOGIN"
+      - "NOSUPERUSER"
+    # Additional roles to grant (Optional)
+    roles: ["reader", "writer"]
+    # Database-specific privileges (Optional)
+    privileges:
       - database: app_db
         type: schema
         objs: public
         privileges: ALL
 ```
+
+The role supports two types of role management:
+1. `role_attr_flags`: PostgreSQL role attributes that define user capabilities (e.g., SUPERUSER, CREATEDB, LOGIN)
+2. `roles`: Additional roles to grant to the user after creation
+
+Common role attributes include:
+- `LOGIN` / `NOLOGIN`: Whether the role can log in
+- `SUPERUSER` / `NOSUPERUSER`: Superuser status
+- `CREATEDB` / `NOCREATEDB`: Ability to create databases
+- `CREATEROLE` / `NOCREATEROLE`: Ability to create roles
+- `INHERIT` / `NOINHERIT`: Automatically inherit privileges of roles
+- `REPLICATION` / `NOREPLICATION`: Ability to initiate streaming replication
+- `BYPASSRLS` / `NOBYPASSRLS`: Ability to bypass row-level security
 
 ### Backup Configuration
 

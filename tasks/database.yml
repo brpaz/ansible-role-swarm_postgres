@@ -9,9 +9,20 @@
     login_user: postgres
     login_password: "{{ postgres_root_password }}"
     port: "{{ postgres_port }}"
-    role_attr_flags: "{{ item.roles | default([]) | join(',') }}"
+    role_attr_flags: "{{ item.role_attr_flags | default([]) | join(',') }}"
   loop: "{{ postgres_users }}"
   when: postgres_users | length > 0
+
+- name: Grant predefined roles to users
+  community.postgresql.postgresql_query:
+    query: "GRANT {{ item.roles | join(', ') }} TO {{ item.name }};"
+    database: postgres
+    login_host: 127.0.0.1
+    login_user: postgres
+    login_password: "{{ postgres_root_password }}"
+    port: "{{ postgres_port }}"
+  loop: "{{ postgres_users }}"
+  when: item.roles is defined and item.roles | length > 0
 
 - name: Create databases
   community.postgresql.postgresql_db:

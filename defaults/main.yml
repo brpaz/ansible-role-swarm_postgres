@@ -64,7 +64,9 @@ postgres_databases: []
 # postgres_users:
 #   - name: app_user
 #     password: secure_password
-#     roles: ["CREATEDB", "LOGIN"]  # Optional
+#     roles_attrs_flags: ["CREATEDB", "LOGIN"]  # Optional
+#     roles:
+#       - app_role  # Optional
 #     privileges:  # Optional
 #       - database: app_db
 #         schema: public
@@ -74,20 +76,20 @@ postgres_users: []
 
 ## Backup Configuration
 # pg_dump backup settings
-postgres_backup_enabled: false
-postgres_backup_rclone_enabled: false
-postgres_backup_rclone_remote: ""
-postgres_backup_rclone_path: "/postgres_backups"
-postgres_backup_rclone_args: "--progress"
-postgres_backup_prune_enabled: true
+postgres_pgdump_enabled: false
+postgres_pgdump_rclone_enabled: false
+postgres_pgdump_rclone_remote: ""
+postgres_pgdump_rclone_path: "/postgres_backups"
+postgres_pgdump_rclone_args: "--progress"
+postgres_pgdump_prune_enabled: true
 
-postgres_backup_dir: "/var/backups/postgres"
-postgres_backup_user: "postgres"
-postgres_backup_password: "{{ postgres_root_password }}"
-postgres_backup_keep_days: 7
-postgres_backup_timer: "weekly" # Options: daily, weekly, monthly
-postgres_backup_format: "custom" # Options: plain, custom, directory, tar
-postgres_backup_compress: true
-postgres_backup_databases: [] # Empty means back up all databases
-postgres_backup_ping_url: "" # URL to ping after successful backup (e.g., https://hc-ping.com/your-uuid)
-postgres_backup_prune_ping_url: "" # URL to ping after successful pruning
+postgres_pgdump_dir: "/var/backups/postgres"
+postgres_pgdump_user: "postgres"
+postgres_pgdump_password: "{{ postgres_root_password }}"
+postgres_pgdump_keep_days: 7
+postgres_pgdump_timer: "weekly" # Options: daily, weekly, monthly
+postgres_pgdump_format: "custom" # Options: plain, custom, directory, tar
+postgres_pgdump_compress: true
+postgres_pgdump_databases: [] # Empty means back up all databases
+postgres_pgdump_ping_url: "" # URL to ping after successful backup (e.g., https://hc-ping.com/your-uuid)
+postgres_pgdump_prune_ping_url: "" # URL to ping after successful pruning
