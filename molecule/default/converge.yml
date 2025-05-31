@@ -48,8 +48,8 @@
           POSTGRES_USER: "postgres"
         postgres_wal_enabled: false
         postgres_walg_enabled: false
-        postgres_backup_enabled: false
-        postgres_backup_rclone_enabled: false
+        postgres_pgdump_enabled: false
+        postgres_pgdump_rclone_enabled: false
         postgres_databases:
           - name: "test_db"
             owner: "app_user"
@@ -62,4 +62,3 @@
                 type: schema
                 objs: public
                 privileges: ALL
-

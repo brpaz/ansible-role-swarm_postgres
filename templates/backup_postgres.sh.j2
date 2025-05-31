@@ -7,17 +7,17 @@
 set -o pipefail
 
 # Config variables set by Ansible
-BACKUP_DIR="{{ postgres_backup_dir }}"
+BACKUP_DIR="{{ postgres_pgdump_dir }}"
 POSTGRES_USER="postgres"
 POSTGRES_PASSWORD="{{ postgres_root_password }}"
 POSTGRES_HOST="127.0.0.1"
 POSTGRES_PORT="{{ postgres_port }}"
-KEEP_DAYS="{{ postgres_backup_keep_days }}"
-BACKUP_FORMAT="{{ postgres_backup_format }}"
-BACKUP_COMPRESS="{{ postgres_backup_compress }}"
-RCLONE_ENABLED="{{ postgres_backup_rclone_enabled }}"
-RCLONE_REMOTE="{{ postgres_backup_rclone_remote }}"
-RCLONE_ARGS="{{ postgres_backup_rclone_args | default('') }}"
+KEEP_DAYS="{{ postgres_pgdump_keep_days }}"
+BACKUP_FORMAT="{{ postgres_pgdump_format }}"
+BACKUP_COMPRESS="{{ postgres_pgdump_compress }}"
+RCLONE_ENABLED="{{ postgres_pgdump_rclone_enabled }}"
+RCLONE_REMOTE="{{ postgres_pgdump_rclone_remote }}"
+RCLONE_ARGS="{{ postgres_pgdump_rclone_args | default('') }}"
 
 # Initialize a variable to track if any errors occurred
 BACKUP_ERRORS=0
@@ -110,8 +110,8 @@ do_backup() {
 
 # Get database list or use specified databases
 DATABASES=""
-{% if postgres_backup_databases|length > 0 %}
-DATABASES="{{ postgres_backup_databases|join(' ') }}"
+{% if postgres_pgdump_databases|length > 0 %}
+DATABASES="{{ postgres_pgdump_databases|join(' ') }}"
 log_info "Backing up specified databases: $DATABASES"
 {% else %}
 export PGPASSWORD="$POSTGRES_PASSWORD"

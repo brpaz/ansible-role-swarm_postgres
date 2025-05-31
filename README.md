@@ -146,18 +146,18 @@ The role uses a custom PostgreSQL Docker image that includes WAL-G, a tool that 
 
 | Variable                         | Default Value           | Description                                   |
 | -------------------------------- | ----------------------- | --------------------------------------------- |
-| `postgres_backup_enabled`        | `false`                 | Whether to enable pg_dump backups             |
-| `postgres_backup_dir`            | `/var/backups/postgres` | Directory for backups                         |
-| `postgres_backup_keep_days`      | `7`                     | Days to keep backups                          |
-| `postgres_backup_hour`           | `02`                    | Hour to run backup (24-hour format)           |
-| `postgres_backup_minute`         | `00`                    | Minute to run backup                          |
-| `postgres_backup_format`         | `custom`                | Backup format (plain, custom, directory, tar) |
-| `postgres_backup_compress`       | `true`                  | Whether to compress backups                   |
-| `postgres_backup_databases`      | `[]`                    | List of databases to backup (empty = all)     |
-| `postgres_backup_rclone_enabled` | `false`                 | Whether to use rclone for remote backups      |
-| `postgres_backup_rclone_remote`  | ``                      | Rclone remote destination                     |
-| `postgres_backup_rclone_args`    | `--progress`            | Additional arguments for rclone command       |
-| `postgres_backup_prune_enabled`  | `true`                  | Whether to enable pruning of old backups      |
+| `postgres_pgdump_enabled`        | `false`                 | Whether to enable pg_dump backups             |
+| `postgres_pgdump_dir`            | `/var/backups/postgres` | Directory for backups                         |
+| `postgres_pgdump_keep_days`      | `7`                     | Days to keep backups                          |
+| `postgres_pgdump_hour`           | `02`                    | Hour to run backup (24-hour format)           |
+| `postgres_pgdump_minute`         | `00`                    | Minute to run backup                          |
+| `postgres_pgdump_format`         | `custom`                | Backup format (plain, custom, directory, tar) |
+| `postgres_pgdump_compress`       | `true`                  | Whether to compress backups                   |
+| `postgres_pgdump_databases`      | `[]`                    | List of databases to backup (empty = all)     |
+| `postgres_pgdump_rclone_enabled` | `false`                 | Whether to use rclone for remote backups      |
+| `postgres_pgdump_rclone_remote`  | ``                      | Rclone remote destination                     |
+| `postgres_pgdump_rclone_args`    | `--progress`            | Additional arguments for rclone command       |
+| `postgres_pgdump_prune_enabled`  | `true`                  | Whether to enable pruning of old backups      |
 
 #### Remote Backups with Rclone
 
@@ -191,12 +191,12 @@ When rclone is disabled:
 
 ```yaml
 # Enable backups with rclone remote storage
-postgres_backup_enabled: true
-postgres_backup_dir: "/opt/backups/postgres"
-postgres_backup_format: "custom"
-postgres_backup_rclone_enabled: true
-postgres_backup_rclone_remote: "s3:my-postgres-backups/dailies"
-postgres_backup_rclone_args: "--s3-storage-class=STANDARD_IA --progress"
+postgres_pgdump_enabled: true
+postgres_pgdump_dir: "/opt/backups/postgres"
+postgres_pgdump_format: "custom"
+postgres_pgdump_rclone_enabled: true
+postgres_pgdump_rclone_remote: "s3:my-postgres-backups/dailies"
+postgres_pgdump_rclone_args: "--s3-storage-class=STANDARD_IA --progress"
 ```
 
 ##### Restoring from Rclone Backups
