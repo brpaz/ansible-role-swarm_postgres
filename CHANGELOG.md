@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v0.2.0 - 2025-05-31
+
+### What's Changed
+
+#### 🚀 Features
+
+- feat: rename pgdump variables @brpaz (#1)
+  **Full Changelog**: [https://github.com/brpaz/ansible-role-swarm_postgres/compare/v0.1.1...v0.2.0](https://github.com/brpaz/ansible-role-swarm_postgres/compare/v0.1.1...v0.2.0)
+
 ## v0.1.0 - 2025-05-24
 
 ### What's Changed
