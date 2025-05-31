@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.3.1 - 2025-05-31
+
+### What's Changed
+
+- fix: wrong argument name for database @brpaz (#3)
+  **Full Changelog**: [https://github.com/brpaz/ansible-role-swarm_postgres/compare/v0.3.0...v0.3.1](https://github.com/brpaz/ansible-role-swarm_postgres/compare/v0.3.0...v0.3.1)
+
 ## v0.3.0 - 2025-05-31
 
 ### What's Changed
