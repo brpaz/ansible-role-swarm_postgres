@@ -3,5 +3,5 @@ ansible-lint~=25.4.0
 docker~=7.1.0
 molecule~=25.4.0
 molecule-docker~=2.1.0
-pytest~=8.3.4
+pytest~=8.4.0
 pytest-testinfra~=10.2.2
