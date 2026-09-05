@@ -26,6 +26,12 @@
     - name: Install docker
       ansible.builtin.include_role:
         name: geerlingguy.docker
+      vars:
+        # The molecule test container's own docker storage is already
+        # overlay2; nesting another overlay2 daemon on top of it fails
+        # to mount ("invalid argument") on current CI runner images.
+        docker_daemon_options:
+          storage-driver: vfs
 
     - name: Init swarm
       community.docker.docker_swarm:
