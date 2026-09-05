@@ -23,10 +23,10 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
@@ -53,7 +53,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: robertdebock/galaxy-action@1.2.1
         with:
@@ -67,7 +67,7 @@ jobs:
           release-notes: ${{ github.event.release.body }}
 
       - name: Commit updated CHANGELOG file
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           branch: main
           commit_message: "chore(release): [skip-ci] ${{ github.event.release.tag_name }}"
