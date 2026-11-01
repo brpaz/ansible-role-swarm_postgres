@@ -8,7 +8,7 @@
     login_host: 127.0.0.1
     login_user: postgres
     login_password: "{{ postgres_root_password }}"
-    port: "{{ postgres_port }}"
+    login_port: "{{ postgres_port }}"
     role_attr_flags: "{{ item.role_attr_flags | default([]) | join(',') }}"
   loop: "{{ postgres_users }}"
   when: postgres_users | length > 0
@@ -20,7 +20,7 @@
     login_host: 127.0.0.1
     login_user: postgres
     login_password: "{{ postgres_root_password }}"
-    port: "{{ postgres_port }}"
+    login_port: "{{ postgres_port }}"
   loop: "{{ postgres_users }}"
   when: item.roles is defined and item.roles | length > 0
 
@@ -36,13 +36,13 @@
     login_host: 127.0.0.1
     login_user: postgres
     login_password: "{{ postgres_root_password }}"
-    port: "{{ postgres_port }}"
+    login_port: "{{ postgres_port }}"
   loop: "{{ postgres_databases }}"
   when: postgres_databases | length > 0
 
 - name: Set user privileges
   community.postgresql.postgresql_privs:
-    database: "{{ item.1.database }}"
+    login_db: "{{ item.1.database }}"
     type: "{{ item.1.type | default('omit') }}"
     schema: "{{ item.1.schema | default(omit) }}"
     objs: "{{ item.1.objs | default('omit') }}"
@@ -52,6 +52,6 @@
     login_host: 127.0.0.1
     login_user: postgres
     login_password: "{{ postgres_root_password }}"
-    port: "{{ postgres_port }}"
+    login_port: "{{ postgres_port }}"
   loop: "{{ postgres_users | subelements('privileges', skip_missing=True) }}"
   when: postgres_users | length > 0
