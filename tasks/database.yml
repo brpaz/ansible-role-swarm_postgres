@@ -42,7 +42,7 @@
 
 - name: Set user privileges
   community.postgresql.postgresql_privs:
-    database: "{{ item.1.database }}"
+    login_db: "{{ item.1.database }}"
     type: "{{ item.1.type | default('omit') }}"
     schema: "{{ item.1.schema | default(omit) }}"
     objs: "{{ item.1.objs | default('omit') }}"
